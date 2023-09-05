@@ -1,0 +1,52 @@
+abstract class rdd
+    * take spark context and dependencies as class parameters
+    * if spark context is not provided while creating the RDD class it throws an error
+    * spark does not support nested RDD as RDD operation runs in parallel on each executor so you cannot access an entire RDD inside an executor. Spark gives a warning when it detects this as the user program might not have a job that results in execution of this. When an execution happens it fails with Null Pointer Exception (NPE)
+    * constructors
+        * construct RDD with one parent dependency
+    * private variables
+        * id: unique id for RDD
+        * name: friendly name for RDD @transient field i.e. not searilized but recalculated 
+        * partitioner: optionally implemented by subclass to specify how RDD is partitioned. @transient
+        * stateLock: locks for mutable state of the RDD
+        * dependencies_: @volatile i.e can be changed outside the program without its knowledge. these are overwritten if the RDD is checkpointed. 
+        * legacyDependencies: store a weak reference to legacy dependencies of RDD useful when RDD is checkpointed. transient and volatile
+        * partitions_: ??
+    * public variables
+    * private methods
+        * checkpointRDD: a holder if RDD is checkpointed 
+    * final methods
+        * dependencies: if checkpointed RDD then map to it else calculate dependencies of this RDD
+        * internalDependencies: private method. get the list of dependencies ignoring the checkpoint so it returns legacyDependencies or dependencies_ or calculates the dependencies via getDependencies 
+        * partitions: for checkpointed RDD get partitions immediately else call it from getPartitions method. 
+        * getNumPartitions: get number of partitions
+        * preferredLocations: get a preferred location for a split. calls getPreferredLocations checkpointedRDD first else on RDD.
+        * 
+    * methods to be implemented by subclasses
+        * compute: how to compute a given partition
+        * getPartitions: get all partitions of the given RDD, only called once so safe to implement time consuming computation
+        * getDependencies: how this RDD depend on parent RDDs, only called once so safe to implement time consuming computation
+        * getPreferredLocations: optionally implemented by subsclasses to specify location preferences
+    * methods common to all RDD
+        * sparkContext
+        * setName: set a friendly name for RDD
+        * persist
+            * private function with all details of persisting that is called by public persist functions. 
+                * if persisting for 1st time add to the cleanup of spark context
+                * inputs storage level and overide boolean flag
+                * if it cannot persist to the given storage level either becaue current storage level is same as requested or override is false then throw error
+            * public function to persist to a given storage level. if RDD already persisted then allow override flag is set to true else set to false
+            * public function to persist RDD to the default storage level which is memory only
+            * cache is same as above
+        * unpersist: remove RDD id from persistence list and set its storage level to NONE. will also remove blocks from disk/memory
+        * getStorageLevel: get the current storage level for RDD
+
+
+object rdd
+    * contains implicit functions to convert RDD to different type of RDDs e.g PairRDDFunctions to provide extra functionalities (like RichInt). The conversion is to RDD wrapper classes not to any RDD type classes i.e. RDD to SomeRDDFunctions  
+
+object DeterministicLevel
+    * enum
+    * DETERMINATE: RDD output is always the same data in same order
+    * UNORDERED: RDD output is always the same data but order can be different
+    * INDETERMINATE: RDD output can be different after rerun
